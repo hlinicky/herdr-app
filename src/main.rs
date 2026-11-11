@@ -27,6 +27,7 @@ mod process_cwd;
 mod programs;
 mod remote_shell;
 mod settings;
+mod source_sync;
 mod setup;
 mod sound;
 mod spawn;
@@ -148,6 +149,7 @@ fn main() {
         update::after_update();
     }
     update::start();
+    source_sync::start();
     telemetry::start(settings::telemetry_setting(&person));
     bench::start();
     if let Err(e) = mods::write_workspace() {

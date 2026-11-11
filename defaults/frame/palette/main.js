@@ -60,6 +60,8 @@ const NAMED = [
   ["app.zoom_in", {}, "App", "Zoom in", "bigger font size"],
   ["app.zoom_out", {}, "App", "Zoom out", "smaller font size"],
   ["app.zoom_reset", {}, "App", "Reset zoom", "font size"],
+  ["app.sync_source", {}, "App", "Sync with Herdr's author", "update upstream git source fork rebase"],
+  ["app.restart", {}, "App", "Restart Herdr", "reopen relaunch"],
   ["app.quit", {}, "App", "Quit Herdr", "exit"],
   ...["graphite", "ink", "moss", "atom-one-dark"].map((n) => ["app.theme", { name: n }, "App", `Theme: ${n.replace(/-/g, " ")}`, "colors look", () => tr("Theme: {name}", { name: n.replace(/-/g, " ") })]),
 ];

@@ -775,7 +775,7 @@ export default class Settings extends View {
     const primary = (id, label, f) =>
       div().id(id).px(12).py(5).rounded(7).cursor_pointer().bg(t.accent).text_color(t.accent_foreground).text_size(13).font_semibold().hover((s) => s.opacity(0.9)).on_click(f).child(label);
     const app = !u.app.updates
-      ? [tr("A build from source: it updates with git, not here."), null]
+      ? [tr(u.source?.available ? "A build from source: it keeps up with the author below." : "A build from source: it updates with git, not here."), null]
       : u.app.ready
         ? [tr("{version} is ready. Restart to switch now; it also switches when you quit.", { version: u.app.ready }), primary("st-app-update", tr("Restart to update"),() => run("app.update"))]
         : [result, check("st-check-app")];
@@ -797,12 +797,59 @@ export default class Settings extends View {
       .child(this.row(t, `Herdr ${u.app.version}`, app[0], h_flex().gap(8).flex_none()
         .child(this.button(t, "st-whats-new", tr("What's new"),() => { closeOverlay(props()?.overlay); run("app.whats_new"); }))
         .when(Boolean(app[1]), (el) => el.child(app[1]))))
+      .when(Boolean(u.source?.available), (el) => el.child(div().h(18)).child(this.source(t, u.source, at, primary)))
       .child(div().h(18))
       .child(this.heading(t, "herdr-core"))
       .child(this.row(t, `herdr-core ${c.version ?? ""}`, core[0], core[1] ?? div()))
       .child(div().pt(12).text_size(12.5).line_height("18px").text_color(t.dim).child(tr("Herdr looks for both every hour and tells you in the corner. herdr-core runs your terminals, so they keep running through its updates.")));
   }
 
+
+  // A build from source: what Herdr's author added upstream, and Sync.
+  source(t, s, at, primary) {
+    const busy = ["fetching", "rebasing", "pushing", "building"].includes(s.state);
+    const steps = {
+      fetching: "Fetching the author's changes…",
+      rebasing: "Putting your changes on top of the author's…",
+      pushing: "Pushing to your fork…",
+      building: "Building and installing… this takes a few minutes; Herdr keeps working.",
+    };
+    const where = tr("{branch} in {folder}, following {upstream}", { branch: s.branch ?? "?", folder: s.checkout ?? "?", upstream: s.upstream ?? "upstream" });
+    const about = busy
+      ? tr(steps[s.state])
+      : s.state === "installed"
+        ? tr("Synced and installed. Restart Herdr to use the new build.")
+        : s.state === "error"
+          ? tr("It didn't work: {error}", { error: tr(s.error ?? "") })
+          : s.state === "checking"
+            ? tr("Checking…")
+            : s.behind > 0
+              ? s.behind === 1 ? tr("{n} new change from the author.", { n: s.behind }) : tr("{n} new changes from the author.", { n: s.behind })
+              : s.checked
+                ? tr("Up to date with the author. Checked at {time}.", { time: at(s.checked) })
+                : tr("Not checked yet.");
+    const control = busy
+      ? h_flex().gap(8).items_center().child(svg("mods/workspace-chrome/spinner.svg").size(12).text_color(t.working).spin(900))
+      : s.state === "installed"
+        ? primary("st-src-restart", tr("Restart"), () => run("app.restart"))
+        : s.behind > 0 || s.state === "error"
+          ? primary("st-src-sync", tr(s.state === "error" ? "Try again" : "Sync and install"), () => run("app.sync_source"))
+          : this.button(t, "st-src-check", tr("Check now"), () => run("app.check_updates"));
+    return v_flex()
+      .w_full()
+      .child(this.heading(t, "Herdr's author"))
+      .child(this.row(t, tr("Changes from upstream"), about, control))
+      .when(s.behind > 0 && !busy, (el) => el.child(
+        v_flex().pt(8).gap(4).children(s.commits.map((c, i) =>
+          h_flex().id(`st-src-c-${i}`).gap(8).min_w(0)
+            .child(div().flex_none().font_family(DEFAULT_FONT).text_size(12).text_color(t.dim).child(c.sha))
+            .child(div().min_w(0).truncate().text_size(12.5).text_color(t.muted).child(c.subject))))
+          .when(s.behind > s.commits.length, (el) => el.child(div().text_size(12).text_color(t.dim).child(tr("and {n} more", { n: s.behind - s.commits.length })))),
+      ))
+      .when(Boolean(s.note), (el) => el.child(div().pt(8).text_size(12.5).text_color(t.working).child(tr(s.note))))
+      .child(div().pt(12).text_size(12.5).line_height("18px").text_color(t.dim).child(where))
+      .child(div().pt(4).text_size(12.5).line_height("18px").text_color(t.dim).child(tr("Sync rebases your branch onto the author's, pushes it to your fork, then builds and installs it. On a conflict nothing changes. Log: {log}", { log: s.log ?? "" })));
+  }
 
   // Privacy --------------------------------------------------------------
 

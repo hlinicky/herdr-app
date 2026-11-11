@@ -732,6 +732,40 @@ fn the_language_section_offers_system_and_each_language_in_its_own_words(cx: &mu
 }
 
 #[gpui::test]
+fn a_source_build_offers_the_authors_new_changes_and_sync(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged = Staged::new();
+    let source = |state: &str, behind: usize| json!({
+        "available": true, "checkout": "/src/herdr-app", "branch": "feat/x", "upstream": "upstream/master",
+        "behind": behind, "commits": [{"sha": "abc1234", "subject": "fix: something"}], "head": "abc1234def",
+        "state": state, "error": null, "note": null, "checked": 1700000000, "log": "/fixture/app/source-sync.log",
+    });
+    for (state, behind, want, not) in [
+        ("idle", 3, "st-src-sync", "st-src-restart"),
+        ("idle", 0, "st-src-check", "st-src-sync"),
+        ("building", 3, "spinner.svg", "st-src-sync"),
+        ("installed", 0, "st-src-restart", "st-src-sync"),
+        ("error", 0, "st-src-sync", "st-src-check"),
+    ] {
+        let mut p = props();
+        p["section"] = json!("updates");
+        let mut u = updates("source", "current");
+        u["source"] = source(state, behind);
+        let tree = describe(cx, &staged, "frame/settings", true, p, u, None).unwrap_or_else(|e| panic!("{state}: {e:#}"));
+        assert!(tree.contains(want), "{state}/{behind}: missing {want}: {tree}");
+        assert!(!tree.contains(not), "{state}/{behind}: unexpected {not}: {tree}");
+        if behind > 0 && state == "idle" {
+            assert!(tree.contains("fix: something"), "the new commits are listed: {tree}");
+        }
+    }
+    // A release build (no source) shows no section.
+    let mut p = props();
+    p["section"] = json!("updates");
+    let tree = describe(cx, &staged, "frame/settings", true, p, updates("current", "current"), None).unwrap();
+    assert!(!tree.contains("st-src-"), "{tree}");
+}
+
+#[gpui::test]
 fn settings_sections_and_updates(cx: &mut TestAppContext) {
     cx.update(gpui_shell::init);
     let start = Instant::now();

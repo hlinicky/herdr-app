@@ -3399,7 +3399,22 @@ impl AppWindow {
                 }
                 return;
             }
-            "app.check_updates" => crate::update::check_now(),
+            "app.check_updates" => {
+                crate::update::check_now();
+                crate::source_sync::check_now();
+            }
+            "app.sync_source" => {
+                if let Err(e) = crate::source_sync::sync() {
+                    return self.fail(e);
+                }
+            }
+            "app.restart" => {
+                self.drain_documents(window, cx);
+                if !crate::update::relaunch() {
+                    return self.fail("this build can't reopen itself: open Herdr again by hand");
+                }
+                cx.quit();
+            }
             "app.update_core" => {
                 if crate::update::core().ready.is_none() && crate::update::core().error.is_none() {
                     return self.fail("herdr-core is up to date");
@@ -3869,6 +3884,7 @@ impl AppWindow {
             self.update_ready = ready;
             cx.notify();
         }
+        self.source_news(window, cx);
         // The settings screen shows versions and progress: redraw mods when they move.
         let status = crate::update::status().to_string();
         if status != self.update_status {
@@ -4418,7 +4434,7 @@ impl AppWindow {
                 .border_1().border_color(c("border")).text_size(settings::z(13.0)).text_color(c("foreground"))
                 .id("core-update-error").cursor_pointer()
                 .on_click(cx.listener(|this, _, w, cx| this.run("app.settings", json!({ "section": "updates" }), w, cx)))
-                .child(format!("herdr-core update failed: {error} · Open Updates")).into_any_element());
+                .child(crate::i18n::tv("herdr-core update failed: {error} · Open Updates", json!({ "error": error }))).into_any_element());
         }
         out.extend(pill);
         out
@@ -4428,15 +4444,34 @@ impl AppWindow {
 const UPDATE_PILL_HEIGHT: f32 = 34.0;
 
 impl AppWindow {
+    /// A build from source: new upstream commits, a finished or failed sync, as toasts.
+    fn source_news(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::i18n::{t, tv};
+        for news in crate::source_sync::take_news() {
+            let (title, body, level) = match news {
+                crate::source_sync::News::Behind { n, first } => {
+                    let text = if n == 1 { "{n} new change from Herdr's author" } else { "{n} new changes from Herdr's author" };
+                    (tv(text, json!({ "n": n })), first, "info")
+                }
+                crate::source_sync::News::Installed => (t("Synced and installed"), t("Restart Herdr to use the new build: Settings › Updates."), "success"),
+                crate::source_sync::News::Failed(e) => (t("Sync with the author failed"), t(&e), "error"),
+            };
+            let n = json!({ "title": title, "body": body, "level": level, "timeout": 15000,
+                "action": { "name": "app.settings", "args": { "section": "updates" } } });
+            self.open_overlay(mods::new_overlay_id(), json!({ "kind": "toast", "notification": n }), window, cx);
+        }
+    }
+
     /// "Herdr 0.2.0 is ready · Restart": the frame's, so no layout or mod can hide it.
     /// What's waiting, in words: the pill shows it until clicked or dismissed.
     fn update_label() -> Option<String> {
+        use crate::i18n::tv;
         let core = crate::update::core();
         let core = core.ready.filter(|_| !core.updating);
         match (crate::update::ready(), core) {
-            (Some(a), Some(c)) => Some(format!("Herdr {a} and herdr-core {c} are ready")),
-            (Some(a), None) => Some(format!("Herdr {a} is ready")),
-            (None, Some(c)) => Some(format!("herdr-core {c} is ready")),
+            (Some(a), Some(c)) => Some(tv("Herdr {app} and herdr-core {core} are ready", json!({ "app": a, "core": c }))),
+            (Some(a), None) => Some(tv("Herdr {version} is ready", json!({ "version": a }))),
+            (None, Some(c)) => Some(tv("herdr-core {version} is ready", json!({ "version": c }))),
             (None, None) => None,
         }
     }
@@ -4445,7 +4480,7 @@ impl AppWindow {
         let app_version = crate::update::ready();
         let app_ready = app_version.is_some();
         let success = self.update_ready.is_none() && self.update_success;
-        let label = self.update_ready.clone().or_else(|| success.then(|| format!("Updated to {}", env!("CARGO_PKG_VERSION"))))?;
+        let label = self.update_ready.clone().or_else(|| success.then(|| crate::i18n::tv("Updated to {version}", json!({ "version": env!("CARGO_PKG_VERSION") }))))?;
         let dismissal = app_version.map(|v| format!("app:{v}")).unwrap_or_else(|| label.clone());
         if self.update_dismissed.as_ref() == Some(&dismissal) { return None; }
         let pill = div()
@@ -4479,11 +4514,11 @@ impl AppWindow {
                     .text_color(c("accent_foreground"))
                     .font_weight(FontWeight::SEMIBOLD)
                     .hover(|s| s.opacity(0.9))
-                    .child("Restart")
+                    .child(crate::i18n::t("Restart"))
                     .on_click(cx.listener(|this, _, w, cx| this.run("app.update", json!({}), w, cx))),
             ))
             .child(div().id("update-notes").px(settings::z(6.0)).cursor_pointer().text_color(c("accent"))
-                .child(if app_ready || success { "What changed" } else { "Open Updates" })
+                .child(crate::i18n::t(if app_ready || success { "What changed" } else { "Open Updates" }))
                 .on_click(cx.listener(move |this, _, w, cx| {
                     if success { this.update_success = false; }
                     this.run("app.settings", json!({ "section": "updates" }), w, cx);

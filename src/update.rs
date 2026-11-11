@@ -134,6 +134,7 @@ pub fn status() -> serde_json::Value {
         "checked": *CHECKED.lock().unwrap(),
         "checks": RUNNING.load(Ordering::Relaxed),
         "checking": CHECKING.load(Ordering::Relaxed),
+        "source": crate::source_sync::status(),
     })
 }
 
@@ -516,8 +517,9 @@ fn swap(root: &Path) -> bool {
 }
 
 /// Opens the app again once this process has exited (after `apply`).
-pub fn relaunch() {
-    relaunch_expected(None);
+/// Opens the app again once this process has exited; false when it can't.
+pub fn relaunch() -> bool {
+    relaunch_expected(None)
 }
 
 #[cfg(windows)]
