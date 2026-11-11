@@ -1,7 +1,7 @@
 // A text prompt. Enter saves, Esc cancels.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { run, props, closeOverlay, theme } from "herdr";
+import { run, props, closeOverlay, theme, tr } from "herdr";
 
 export default class Prompt extends View {
   init(_props, cx) {
@@ -40,11 +40,11 @@ export default class Prompt extends View {
       .w_full().min_h(0).p(18).bg(t.popover).text_color(t.foreground)
       .child(h_flex().items_center().child(div().flex_1().text_size(15).font_semibold().child((p.title ?? "").replace(/^./, (c) => c.toUpperCase())))
         .child(div().text_size(11).text_color(t.dim).child("Esc")))
-      .child(label("Name"))
+      .child(label(tr("Name")))
       .child(Input.new(this.input).h(36).px(10).rounded(9).border_1().border_color(this.inputFocused ? t.accent : t.input).bg(t.background).text_size(12.8).text_color(t.foreground))
       .when(Boolean(p.hint), el => el.child(div().pt(6).text_size(11.5).text_color(t.dim).child(p.hint)))
       .child(h_flex().pt(20).gap(8).justify_end()
-        .child(button("pm-cancel", "Cancel", false, () => closeOverlay(p.overlay)))
-        .child(button("pm-save", "Save", true, () => this.submit())));
+        .child(button("pm-cancel", tr("Cancel"), false, () => closeOverlay(p.overlay)))
+        .child(button("pm-save", tr("Save"), true, () => this.submit())));
   }
 }

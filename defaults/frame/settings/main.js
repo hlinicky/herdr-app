@@ -2,12 +2,13 @@
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Scrollbar, InputState, Input, Popup } from "gpui-base";
-import { hc, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, window } from "herdr";
+import { hc, run, theme, themes, fonts, updates, telemetry, settings, layouts, shared, appHome, readTextFile, writeTextFile, playSound, props, closeOverlay, window, tr, languages } from "herdr";
 
 const I = (name) => `frame/settings/${name}.svg`;
 
 const SECTIONS = [
   { id: "look", title: "Look", icon: "palette" },
+  { id: "language", title: "Language", icon: "languages" },
   ...(window()?.platform === "macos" ? [{ id: "keyboard", title: "Keyboard", icon: "keyboard" }] : []),
   { id: "machines", title: "Machines", icon: "server" },
   { id: "alerts", title: "Alerts", icon: "bell" },
@@ -32,7 +33,7 @@ export default class Settings extends View {
     this.section = SECTIONS.some((s) => s.id === asked) ? asked : "look";
     this.picking = null; // "font" | "ui_font" while its list is open
     this.filter = "";
-    this.fontInput = InputState.new({ placeholder: "Type to search fonts" });
+    this.fontInput = InputState.new({ placeholder: tr("Type to search fonts") });
     this.fontInput.on("change", (_e, cx) => { this.filter = this.fontInput.value(); cx.notify(); });
     this.renameInput = InputState.new();
     this.renameInput.on("focus", (_e, cx) => { this.renameFocused = true; cx.notify(); });
@@ -132,7 +133,7 @@ export default class Settings extends View {
   // Pieces ---------------------------------------------------------------
 
   heading(t, text) {
-    return div().pt(6).pb(8).text_size(12).font_semibold().text_color(t.dim).child(text.toUpperCase());
+    return div().pt(6).pb(8).text_size(12).font_semibold().text_color(t.dim).child(tr(text).toUpperCase());
   }
 
   // One setting: what it is on the left, the control on the right.
@@ -324,7 +325,7 @@ export default class Settings extends View {
                 else p.appearance = value;
               }, cx),
             )
-            .child(label),
+            .child(tr(label)),
         ),
       );
   }
@@ -462,7 +463,7 @@ export default class Settings extends View {
           .h(200)
           .p(4)
           .overflow_y_scrollbar()
-          .when(!q, (el) => el.child(item(`st-fd-${which}`, `Default (${def})`, def, (_e, cx) => choose(null, cx))))
+          .when(!q, (el) => el.child(item(`st-fd-${which}`, tr("Default ({font})", { font: def }), def, (_e, cx) => choose(null, cx))))
           .children(matches.map((f, i) => item(`st-fi-${which}-${i}`, f, f, (_e, cx) => choose(f, cx)))),
       );
   }
@@ -479,7 +480,7 @@ export default class Settings extends View {
           this.row(
             t,
             title,
-            own(which, family, def) ? "This layout sets its own; yours shows in the others." : null,
+            own(which, family, def) ? tr("This layout sets its own; yours shows in the others.") : null,
             h_flex()
               .gap(8)
               .items_center()
@@ -494,28 +495,28 @@ export default class Settings extends View {
       .child(this.layoutPicker(t, cx))
       .child(div().h(18))
       .child(this.heading(t, "Theme"))
-      .child(this.row(t, "Appearance", "Light or dark, or as your system is now.", this.appearancePicker(t, cx)))
-      .child(div().pt(12).pb(8).text_size(12.5).text_color(t.dim).child("For the layout you're in: each layout keeps its own light and dark theme."))
-      .child(div().pb(6).text_size(12.5).font_medium().text_color(t.muted).child("Dark"))
+      .child(this.row(t, tr("Appearance"), tr("Light or dark, or as your system is now."), this.appearancePicker(t, cx)))
+      .child(div().pt(12).pb(8).text_size(12.5).text_color(t.dim).child(tr("For the layout you're in: each layout keeps its own light and dark theme.")))
+      .child(div().pb(6).text_size(12.5).font_medium().text_color(t.muted).child(tr("Dark")))
       .child(this.themePicker(t, false))
-      .child(div().pt(10).pb(6).text_size(12.5).font_medium().text_color(t.muted).child("Light"))
+      .child(div().pt(10).pb(6).text_size(12.5).font_medium().text_color(t.muted).child(tr("Light")))
       .child(this.themePicker(t, true))
       .child(div().h(18))
       .child(this.heading(t, "Size and fonts"))
       .child(
         this.row(
           t,
-          "Zoom",
-          "Everything: terminals, panels, text.",
+          tr("Zoom"),
+          tr("Everything: terminals, panels, text."),
           h_flex()
             .gap(8)
             .items_center()
             .child(this.stepper(t, "st-zoom", `${Math.round(s.zoom * 100)}%`, () => run("app.zoom_out"), () => run("app.zoom_in")))
-            .child(this.button(t, "st-zoom-reset", "Reset", () => run("app.zoom_reset"))),
+            .child(this.button(t, "st-zoom-reset", tr("Reset"),() => run("app.zoom_reset"))),
         ),
       )
-      .child(fontRow("font", "font_size", "Terminal font", s.font_family, DEFAULT_FONT, s.font_size))
-      .child(fontRow("ui_font", null, "Interface font", s.ui_font_family, DEFAULT_UI_FONT));
+      .child(fontRow("font", "font_size", tr("Terminal font"), s.font_family, DEFAULT_FONT, s.font_size))
+      .child(fontRow("ui_font", null, tr("Interface font"), s.ui_font_family, DEFAULT_UI_FONT));
   }
 
   keyboard(t) {
@@ -529,7 +530,7 @@ export default class Settings extends View {
     return v_flex()
       .w_full()
       .child(this.heading(t, "Option key"))
-      .child(div().pb(12).text_size(13).text_color(t.dim).child("Use Option for terminal shortcuts or to type accents and special characters."))
+      .child(div().pb(12).text_size(13).text_color(t.dim).child(tr("Use Option for terminal shortcuts or to type accents and special characters.")))
       .children(choices.map(([value, label]) => {
         const on = (this.person.option_as_alt ?? "auto") === value;
         return h_flex()
@@ -543,6 +544,38 @@ export default class Settings extends View {
           .hover((s) => s.bg(t.hover))
           .on_click((_e, cx) => this.change((p) => { p.option_as_alt = value; }, cx))
           .child(div().text_color(on ? t.accent : t.muted).child(on ? "◉" : "○"))
+          .child(div().text_size(14).text_color(t.foreground).child(tr(label)));
+      }));
+  }
+
+  // Language -------------------------------------------------------------
+
+  // Each language in its own words; System says which one shows now.
+  language(t) {
+    const chosen = this.person.language ?? null;
+    const own = languages();
+    const now = own.find((l) => l.code === settings().language)?.name ?? "English";
+    const choices = [[null, `${tr("System")} (${now})`], ...own.map((l) => [l.code, l.name])];
+    return v_flex()
+      .w_full()
+      .child(this.heading(t, "Language"))
+      .child(div().pb(12).text_size(13).line_height("18px").text_color(t.dim).child(tr("The language of menus, panels and dialogs. Terminals and agents keep their own.")))
+      .children(choices.map(([value, label]) => {
+        const on = chosen === value;
+        return h_flex()
+          .id(`st-lang-${value ?? "system"}`)
+          .gap(10)
+          .px(12)
+          .py(10)
+          .rounded(7)
+          .items_center()
+          .cursor_pointer()
+          .hover((s) => s.bg(t.hover))
+          .on_click((_e, cx) => this.change((p) => {
+            if (value === null) delete p.language;
+            else p.language = value;
+          }, cx))
+          .child(div().text_color(on ? t.accent : t.muted).child(on ? "◉" : "○"))
           .child(div().text_size(14).text_color(t.foreground).child(label));
       }));
   }
@@ -554,9 +587,9 @@ export default class Settings extends View {
     this.machineLoading = true;
     try {
       const r = await hc(["machine", "ls", "--json"]);
-      if (r.code !== 0) throw new Error(r.stderr || r.stdout || "Couldn't read machines.");
+      if (r.code !== 0) throw new Error(r.stderr || r.stdout || tr("Couldn't read machines."));
       const list = JSON.parse(r.stdout).machines;
-      if (!Array.isArray(list)) throw new Error("Couldn't read machines.");
+      if (!Array.isArray(list)) throw new Error(tr("Couldn't read machines."));
       this.machineList = list.filter((m) => !m.temporary);
       this.machineError = null;
     } catch (e) {
@@ -581,10 +614,14 @@ export default class Settings extends View {
         const r = await hc(args);
         let payload = null;
         try { payload = JSON.parse(r.stdout || r.stderr); } catch {}
-        if (r.code !== 0) throw new Error(payload?.error?.message || (r.stderr || r.stdout || "It didn't work.").trim());
+        if (r.code !== 0) throw new Error(payload?.error?.message || (r.stderr || r.stdout || tr("It didn't work.")).trim());
         const message = action === "update"
-          ? `Updated ${machine}${payload?.version ? ` to hc ${payload.version}` : ""}; its terminals kept running.`
-          : action === "rename" ? `Renamed ${machine} to ${name.trim()}.` : `Removed ${machine}; its terminals keep running there.`;
+          ? payload?.version
+            ? tr("Updated {machine} to hc {version}; its terminals kept running.", { machine, version: payload.version })
+            : tr("Updated {machine}; its terminals kept running.", { machine })
+          : action === "rename"
+            ? tr("Renamed {machine} to {name}.", { machine, name: name.trim() })
+            : tr("Removed {machine}; its terminals keep running there.", { machine });
         if (action === "update") this.machineResults[machine] = { message, ok: true };
         else this.machineNotice = message;
       } catch (e) {
@@ -622,11 +659,11 @@ export default class Settings extends View {
     const color = ["connected", "online"].includes(m.state) ? t.ansi2 : ["connecting", "reconnecting"].includes(m.state) ? t.working : t.blocked;
     const result = this.machineResults[m.name];
     const controls = h_flex().gap(6).items_center();
-    if (busy) controls.child(svg("mods/workspace-chrome/spinner.svg").size(12).text_color(t.working).spin(900)).child(div().text_size(12).text_color(t.muted).child(busy === "update" ? "Updating…" : busy === "rename" ? "Renaming…" : "Removing…"));
+    if (busy) controls.child(svg("mods/workspace-chrome/spinner.svg").size(12).text_color(t.working).spin(900)).child(div().text_size(12).text_color(t.muted).child(tr(busy === "update" ? "Updating…" : busy === "rename" ? "Renaming…" : "Removing…")));
     else {
-      if (this.olderCore(m.version, localVersion)) controls.child(this.button(t, `st-m-update-${m.name}`, "Update", (_e, cx) => this.machineAction(m.name, "update", cx)));
+      if (this.olderCore(m.version, localVersion)) controls.child(this.button(t, `st-m-update-${m.name}`, tr("Update"),(_e, cx) => this.machineAction(m.name, "update", cx)));
       for (const [action, label] of [["rename", "Rename"], ["rm", "Remove"]]) {
-        controls.child(this.button(t, `st-m-${action}-${m.name}`, label, (_e, cx) => {
+        controls.child(this.button(t, `st-m-${action}-${m.name}`, tr(label), (_e, cx) => {
           this.machineEdit = { machine: m.name, action, name: m.name };
           if (action === "rename") {
             this.renameInput.set_value(m.name);
@@ -643,31 +680,31 @@ export default class Settings extends View {
         .child(div().w(7).h(7).flex_none().rounded(4).bg(color))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().text_size(14).text_color(t.foreground).child(m.name))
-          .child(div().text_size(12.5).text_color(t.dim).child(`${m.target ?? ""} · ${state} · ${m.version ? `hc ${m.version}` : "hc version unknown"}`)))
+          .child(div().text_size(12.5).text_color(t.dim).child(`${m.target ?? ""} · ${tr(state)} · ${m.version ? `hc ${m.version}` : tr("hc version unknown")}`)))
         .child(controls.flex_none()));
     if (m.state === "needs_login") {
       const command = `hc machine login ${m.name}`;
       row.child(v_flex().gap(5)
-        .child(div().text_size(12.5).text_color(t.blocked).child("needs a login: run"))
+        .child(div().text_size(12.5).text_color(t.blocked).child(tr("needs a login: run")))
         .child(h_flex().gap(8).items_center()
           .child(div().flex_1().min_w(0).text_size(12.5).text_color(t.foreground).child(command))
-          .child(this.button(t, `st-m-login-copy-${m.name}`, this.copiedLogin === command ? "Copied" : "Copy", (_e, cx) => {
+          .child(this.button(t, `st-m-login-copy-${m.name}`, tr(this.copiedLogin === command ? "Copied" : "Copy"),(_e, cx) => {
             cx.write_to_clipboard(command);
             this.copiedLogin = command;
             cx.notify();
           }))));
     }
-    if (busy === "update") row.child(div().text_size(12.5).text_color(t.dim).child("Copying this computer's herdr-core. Its terminals keep running."));
+    if (busy === "update") row.child(div().text_size(12.5).text_color(t.dim).child(tr("Copying this computer's herdr-core. Its terminals keep running.")));
     if (edit && !busy) {
-      const cancel = this.button(t, `st-m-cancel-${m.name}`, "Cancel", (_e, cx) => { this.machineEdit = null; this.handle.focus(); cx.notify(); });
+      const cancel = this.button(t, `st-m-cancel-${m.name}`, tr("Cancel"),(_e, cx) => { this.machineEdit = null; this.handle.focus(); cx.notify(); });
       if (edit.action === "rm") row.child(v_flex().gap(8)
-        .child(div().text_size(12.5).text_color(t.muted).child(`Remove ${m.name}? Its terminals keep running there.`))
-        .child(h_flex().gap(6).child(cancel).child(this.button(t, `st-m-confirm-${m.name}`, "Remove machine", (_e, cx) => this.machineAction(m.name, "rm", cx)))));
+        .child(div().text_size(12.5).text_color(t.muted).child(tr("Remove {machine}? Its terminals keep running there.", { machine: m.name })))
+        .child(h_flex().gap(6).child(cancel).child(this.button(t, `st-m-confirm-${m.name}`, tr("Remove machine"),(_e, cx) => this.machineAction(m.name, "rm", cx)))));
       else row.child(v_flex().gap(6)
-        .child(div().text_size(12).text_color(t.dim).child("New name (addresses using the old name stop working)"))
+        .child(div().text_size(12).text_color(t.dim).child(tr("New name (addresses using the old name stop working)")))
         .child(h_flex().gap(6).items_center()
           .child(Input.new(this.renameInput).flex_1().min_w(0).h(32).px(10).rounded(7).border_1().border_color(this.renameFocused ? t.accent : t.input).bg(t.background).text_size(13).text_color(t.foreground))
-          .child(cancel).child(this.button(t, `st-m-save-${m.name}`, "Save", (_e, cx) => this.machineAction(m.name, "rename", cx, edit.name)))));
+          .child(cancel).child(this.button(t, `st-m-save-${m.name}`, tr("Save"),(_e, cx) => this.machineAction(m.name, "rename", cx, edit.name)))));
     }
     if (result) row.child(div().text_size(12.5).text_color(result.ok ? t.ansi2 : t.blocked).child(result.message));
     return row;
@@ -677,14 +714,14 @@ export default class Settings extends View {
     const version = updates().core.version;
     return v_flex().w_full()
       .child(this.heading(t, "Machines"))
-      .child(div().pb(8).text_size(12.5).line_height("18px").text_color(t.dim).child("Your computers, reached over ssh. Their terminals keep running when you disconnect."))
-      .child(this.row(t, "This computer", `Connected · ${version ? `hc ${version}` : "hc version unknown"}`, div().w(7).h(7).rounded(4).bg(t.ansi2)))
+      .child(div().pb(8).text_size(12.5).line_height("18px").text_color(t.dim).child(tr("Your computers, reached over ssh. Their terminals keep running when you disconnect.")))
+      .child(this.row(t, tr("This computer"), `${tr("Connected")} · ${version ? `hc ${version}` : tr("hc version unknown")}`, div().w(7).h(7).rounded(4).bg(t.ansi2)))
       .children((this.machineList ?? []).map((m) => this.machineRow(t, m, version)))
-      .when(this.machineList === null && !this.machineError, (el) => el.child(h_flex().py(14).gap(8).items_center().child(svg("mods/workspace-chrome/spinner.svg").size(12).text_color(t.working).spin(900)).child(div().text_size(12.5).text_color(t.dim).child("Reading machines…"))))
-      .when(this.machineList?.length === 0, (el) => el.child(div().py(14).text_size(12.5).text_color(t.dim).child("No other machines yet.")))
+      .when(this.machineList === null && !this.machineError, (el) => el.child(h_flex().py(14).gap(8).items_center().child(svg("mods/workspace-chrome/spinner.svg").size(12).text_color(t.working).spin(900)).child(div().text_size(12.5).text_color(t.dim).child(tr("Reading machines…")))))
+      .when(this.machineList?.length === 0, (el) => el.child(div().py(14).text_size(12.5).text_color(t.dim).child(tr("No other machines yet."))))
       .when(Boolean(this.machineError), (el) => el.child(div().py(10).text_size(12.5).text_color(t.blocked).child(this.machineError)))
       .when(Boolean(this.machineNotice), (el) => el.child(div().py(10).text_size(12.5).text_color(t.ansi2).child(this.machineNotice)))
-      .child(h_flex().pt(16).child(this.button(t, "st-m-add", "Add a machine", () => run("mod.open", { name: "machine-add" }))));
+      .child(h_flex().pt(16).child(this.button(t, "st-m-add", tr("Add a machine"),() => run("mod.open", { name: "machine-add" }))));
   }
 
   // Alerts ---------------------------------------------------------------
@@ -692,21 +729,21 @@ export default class Settings extends View {
   alerts(t) {
     const sounds = this.person.sounds ?? {};
     const on = sounds.enabled !== false;
-    const file = (f) => (f ? f.split(/[\\/]/).pop() : "Herdr's sound");
+    const file = (f) => (f ? f.split(/[\\/]/).pop() : tr("Herdr's sound"));
     return v_flex()
       .w_full()
       .child(this.heading(t, "Sounds"))
       .child(
         this.row(
           t,
-          "Play sounds",
-          "When an agent needs you, and when one finishes while you're not looking. A note shows in the corner either way.",
+          tr("Play sounds"),
+          tr("When an agent needs you, and when one finishes while you're not looking. A note shows in the corner either way."),
           this.toggle(t, "st-sounds", on, (_e, cx) => this.change((p) => (p.sounds = { ...(p.sounds ?? {}), enabled: !on }), cx)),
         ),
       )
-      .child(this.row(t, "An agent needs you", file(sounds.blocked), this.button(t, "st-play-blocked", "Play", () => playSound("blocked"))))
-      .child(this.row(t, "An agent finished", file(sounds.done), this.button(t, "st-play-done", "Play", () => playSound("done"))))
-      .child(div().pt(12).text_size(12.5).line_height("18px").text_color(t.dim).child("Want your own sounds? Ask your agent to set sounds.done and sounds.blocked in settings.json to an MP3."));
+      .child(this.row(t, tr("An agent needs you"), file(sounds.blocked), this.button(t, "st-play-blocked", tr("Play"), () => playSound("blocked"))))
+      .child(this.row(t, tr("An agent finished"), file(sounds.done), this.button(t, "st-play-done", tr("Play"), () => playSound("done"))))
+      .child(div().pt(12).text_size(12.5).line_height("18px").text_color(t.dim).child(tr("Want your own sounds? Ask your agent to set sounds.done and sounds.blocked in settings.json to an MP3.")));
   }
 
   // Updates --------------------------------------------------------------
@@ -717,10 +754,9 @@ export default class Settings extends View {
       const d = new Date(secs * 1000);
       return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
     };
-    const checked = u.checked ? ` Checked at ${at(u.checked)}.` : "";
-    const result = u.checking ? "Checking\u2026" : u.checked
-      ? `Up to date.${checked}`
-      : "No successful check. Check your connection and try again.";
+    const result = u.checking ? tr("Checking\u2026") : u.checked
+      ? tr("Up to date. Checked at {time}.", { time: at(u.checked) })
+      : tr("No successful check. Check your connection and try again.");
     // Pressed: "Checking\u2026" while it looks, then "Up to date" for a moment
     // (a find changes the row instead). One per row: an element shows once.
     const asked = this.asked && Date.now() - this.asked < 3000;
@@ -728,10 +764,10 @@ export default class Settings extends View {
       !u.checks
         ? null
         : u.checking && this.asked
-          ? div().px(12).py(5).text_size(13).text_color(t.dim).child("Checking\u2026")
+          ? div().px(12).py(5).text_size(13).text_color(t.dim).child(tr("Checking\u2026"))
           : asked && u.checked && !u.checking
-            ? div().px(12).py(5).text_size(13).text_color(t.ansi2).child("\u2713 Up to date")
-            : this.button(t, id, "Check now", (_e, cx) => {
+            ? div().px(12).py(5).text_size(13).text_color(t.ansi2).child(`\u2713 ${tr("Up to date")}`)
+            : this.button(t, id, tr("Check now"),(_e, cx) => {
                 this.asked = Date.now();
                 run("app.check_updates");
                 cx.notify();
@@ -739,32 +775,32 @@ export default class Settings extends View {
     const primary = (id, label, f) =>
       div().id(id).px(12).py(5).rounded(7).cursor_pointer().bg(t.accent).text_color(t.accent_foreground).text_size(13).font_semibold().hover((s) => s.opacity(0.9)).on_click(f).child(label);
     const app = !u.app.updates
-      ? ["A build from source: it updates with git, not here.", null]
+      ? [tr("A build from source: it updates with git, not here."), null]
       : u.app.ready
-        ? [`${u.app.ready} is ready. Restart to switch now; it also switches when you quit.`, primary("st-app-update", "Restart to update", () => run("app.update"))]
+        ? [tr("{version} is ready. Restart to switch now; it also switches when you quit.", { version: u.app.ready }), primary("st-app-update", tr("Restart to update"),() => run("app.update"))]
         : [result, check("st-check-app")];
     const c = u.core;
     const core = c.managed
-      ? [`Managed by ${c.managed}: update it there.`, null]
+      ? [tr("Managed by {manager}: update it there.", { manager: c.managed }), null]
       : c.updating
-        ? ["Updating\u2026 your terminals keep running.", null]
+        ? [tr("Updating\u2026 your terminals keep running."), null]
         : c.error
-          ? [`The update failed: ${c.error}`, primary("st-core-retry", "Try again", () => run("app.update_core"))]
+          ? [tr("The update failed: {error}", { error: c.error }), primary("st-core-retry", tr("Try again"), () => run("app.update_core"))]
           : c.ready
-            ? [`${c.ready} is ready. Your terminals keep running through it.`, primary("st-core-update", "Update herdr-core", () => run("app.update_core"))]
+            ? [tr("{version} is ready. Your terminals keep running through it.", { version: c.ready }), primary("st-core-update", tr("Update herdr-core"), () => run("app.update_core"))]
             : u.checks
               ? [result, check("st-check-core")]
-              : ["Not checked: a build from source looks for no updates.", null];
+              : [tr("Not checked: a build from source looks for no updates."), null];
     return v_flex()
       .w_full()
       .child(this.heading(t, "Herdr"))
       .child(this.row(t, `Herdr ${u.app.version}`, app[0], h_flex().gap(8).flex_none()
-        .child(this.button(t, "st-whats-new", "What's new", () => { closeOverlay(props()?.overlay); run("app.whats_new"); }))
+        .child(this.button(t, "st-whats-new", tr("What's new"),() => { closeOverlay(props()?.overlay); run("app.whats_new"); }))
         .when(Boolean(app[1]), (el) => el.child(app[1]))))
       .child(div().h(18))
       .child(this.heading(t, "herdr-core"))
       .child(this.row(t, `herdr-core ${c.version ?? ""}`, core[0], core[1] ?? div()))
-      .child(div().pt(12).text_size(12.5).line_height("18px").text_color(t.dim).child("Herdr looks for both every hour and tells you in the corner. herdr-core runs your terminals, so they keep running through its updates."));
+      .child(div().pt(12).text_size(12.5).line_height("18px").text_color(t.dim).child(tr("Herdr looks for both every hour and tells you in the corner. herdr-core runs your terminals, so they keep running through its updates.")));
   }
 
 
@@ -797,15 +833,15 @@ export default class Settings extends View {
     const s = telemetry();
     const on = s ? s.setting : this.person.telemetry !== false;
     const at = (secs) => new Date(secs * 1000).toLocaleString();
-    const why = s?.off_because ? `Off for now: ${s.off_because} is set where Herdr started.` : null;
+    const why = s?.off_because ? tr("Off for now: {variable} is set where Herdr started.", { variable: s.off_because }) : null;
     const body = v_flex()
       .w_full()
       .child(this.heading(t, "Usage data"))
       .child(
         this.row(
           t,
-          "Share anonymous usage data",
-          why ?? "Once a day: which agents and features you use, how many spaces and tabs, your system and Herdr's version. Never what's in your terminals, never names of files, folders or projects.",
+          tr("Share anonymous usage data"),
+          why ?? tr("Once a day: which agents and features you use, how many spaces and tabs, your system and Herdr's version. Never what's in your terminals, never names of files, folders or projects."),
           this.toggle(t, "st-telemetry", on, (_e, cx) =>
             this.change((p) => {
               if (on) p.telemetry = false;
@@ -817,20 +853,20 @@ export default class Settings extends View {
       .child(
         this.row(
           t,
-          "What we send",
-          s && !s.sends ? "This build never sends: it's built from source. You can still see what a release would send." : "Exactly what leaves your computer, word for word.",
-          this.button(t, "st-telemetry-show", this.showData ? "Hide" : "Show", (_e, cx) => {
+          tr("What we send"),
+          s && !s.sends ? tr("This build never sends: it's built from source. You can still see what a release would send.") : tr("Exactly what leaves your computer, word for word."),
+          this.button(t, "st-telemetry-show", tr(this.showData ? "Hide" : "Show"),(_e, cx) => {
             this.showData = !this.showData;
             cx.notify();
           }),
         ),
       );
     if (!this.showData) return body;
-    if (!s?.enabled) return body.child(div().pt(14).text_size(13).text_color(t.dim).child("Nothing is collected or sent while it's off."));
+    if (!s?.enabled) return body.child(div().pt(14).text_size(13).text_color(t.dim).child(tr("Nothing is collected or sent while it's off.")));
     return body
-      .children(s.queued.map((r, i) => this.report(t, `st-tq-${i}`, `Waiting to send: ${r.day}`, "Sent as is, soon.", r)))
-      .when(Boolean(s.draft), (el) => el.child(this.report(t, "st-td", "Today so far", "A draft: it changes until the day ends (UTC), then goes out once.", s.draft)))
-      .when(Boolean(s.last_sent), (el) => el.child(this.report(t, "st-tl", `Last sent: ${s.last_sent.report.day}`, `Sent ${at(s.last_sent.at)}.`, s.last_sent.report)));
+      .children(s.queued.map((r, i) => this.report(t, `st-tq-${i}`, tr("Waiting to send: {day}", { day: r.day }), tr("Sent as is, soon."), r)))
+      .when(Boolean(s.draft), (el) => el.child(this.report(t, "st-td", tr("Today so far"), tr("A draft: it changes until the day ends (UTC), then goes out once."), s.draft)))
+      .when(Boolean(s.last_sent), (el) => el.child(this.report(t, "st-tl", tr("Last sent: {day}", { day: s.last_sent.report.day }), tr("Sent {time}.", { time: at(s.last_sent.at) }), s.last_sent.report)));
   }
 
   // ----------------------------------------------------------------------
@@ -846,7 +882,7 @@ export default class Settings extends View {
       .gap(2)
       .border_r(1)
       .border_color(t.border)
-      .child(div().px(10).pt(6).pb(12).text_size(16).font_semibold().text_color(t.foreground).child("Settings"))
+      .child(div().px(10).pt(6).pb(12).text_size(16).font_semibold().text_color(t.foreground).child(tr("Settings")))
       .children(
         SECTIONS.map((s) => {
           const on = s.id === this.section;
@@ -869,7 +905,7 @@ export default class Settings extends View {
               cx.notify();
             })
             .child(svg(I(s.icon)).size(15).text_color(on ? t.accent : t.dim))
-            .child(div().flex_1().text_size(13.5).text_color(on ? t.foreground : t.muted).child(s.title))
+            .child(div().flex_1().text_size(13.5).text_color(on ? t.foreground : t.muted).child(tr(s.title)))
             .when(s.id === "updates" && waiting, (el) => el.child(div().w(7).h(7).rounded(4).bg(t.accent)));
         }),
       );
@@ -904,7 +940,7 @@ export default class Settings extends View {
         cx.stop_propagation();
         cx.notify();
       })
-      .child(nav.h_full().child(div().flex_1()).child(this.button(t, "st-feedback", "Send feedback", () => { closeOverlay(props()?.overlay); run("app.feedback"); })))
+      .child(nav.h_full().child(div().flex_1()).child(this.button(t, "st-feedback", tr("Send feedback"),() => { closeOverlay(props()?.overlay); run("app.feedback"); })))
       .child(
         // A bar that always shows: the pages are taller than the dialog and
         // people should see that they scroll.
@@ -927,6 +963,8 @@ export default class Settings extends View {
                   .child(
                     this.section === "look"
                       ? this.look(t, cx)
+                      : this.section === "language"
+                        ? this.language(t)
                       : this.section === "keyboard"
                         ? this.keyboard(t)
                       : this.section === "machines"

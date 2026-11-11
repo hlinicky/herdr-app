@@ -333,6 +333,15 @@ export function sendFeedback(body: import("gpui-kit").HostValue, images?: string
  *  padding and opacity) with the person's zoom and sounds. */
 export function settings(): Record<string, unknown>;
 
+/** `text` (written in English) in the interface's language (`settings().language`), with
+ *  `{name}` filled from `values`. A text the language has no translation for stays English.
+ *  A translation may have plural forms, picked by `values.n`. Mods redraw when the language
+ *  changes, so call it while rendering, not once at load. */
+export function tr(text: string, values?: Record<string, string | number | null>): string;
+
+/** The languages the interface speaks: `code` for settings.json's `language`, `name` in itself. */
+export function languages(): { code: string; name: string }[];
+
 /** Every key binding: { section, keys, action }. */
 export function keys(): { section: string; keys: string; action: string }[];
 

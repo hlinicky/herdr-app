@@ -8,7 +8,7 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextView } from "gpui-base";
-import { hc, exec, home, readTextFile, theme, props, closeOverlay } from "herdr";
+import { hc, exec, home, readTextFile, theme, props, closeOverlay, tr } from "herdr";
 
 const I = (name) => `mods/workspace-chrome/${name}.svg`;
 const shellArg = (target) => /^[a-z0-9_@%+=:,./-]+$/i.test(target) ? target : "'" + target.replace(/'/g, "'\\''") + "'";
@@ -64,7 +64,7 @@ export default class MachineAdd extends View {
     this.pending = new Set();
     this.refreshing = false;
     this.typed = "";
-    this.input = InputState.new({ placeholder: "user@host" });
+    this.input = InputState.new({ placeholder: tr("user@host") });
     this.input.on("change", (_e, cx) => { this.typed = this.input.value(); cx.notify(); });
     this.input.on("submit", (_e, cx) => this.add(this.typed, cx));
     this.inputFocused = true;
@@ -129,7 +129,7 @@ export default class MachineAdd extends View {
       try {
         why = r.code === 0 ? null : (JSON.parse(r.stdout || r.stderr).error ?? { message: (r.stderr || r.stdout).trim() });
       } catch {
-        why = { message: (r.stderr || r.stdout || "it didn't answer").trim() };
+        why = { message: (r.stderr || r.stdout || tr("it didn't answer")).trim() };
       }
       if (!why) {
         delete this.state[target];
@@ -140,8 +140,8 @@ export default class MachineAdd extends View {
       } else if (["hc_missing", "incompatible", "login_needed", "auth_failed", "host_key"].includes(why.kind) || /password|passphrase|host key|permission denied|login/i.test(why.message ?? "")) {
         const quoted = shellArg(target);
         this.pending.add(target);
-        this.state[target] = `Couldn't add ${target} here: it needs you to answer something (a password, a new host key, or installing herdr-core there). Run \`hc machine add ${quoted}\` in a terminal. \`hc machine --help\` shows the options.`;
-      } else this.state[target] = why.message || "it didn't work";
+        this.state[target] = tr("Couldn't add {target} here: it needs you to answer something (a password, a new host key, or installing herdr-core there). Run `{command}` in a terminal. `hc machine --help` shows the options.", { target, command: `hc machine add ${quoted}` });
+      } else this.state[target] = why.message || tr("it didn't work");
       await this.refresh();
       cx.notify();
     });
@@ -169,13 +169,13 @@ export default class MachineAdd extends View {
       .bg(t.blocked + "14")
       .border_1()
       .border_color(t.blocked + "40")
-      .child(div().text_size(12.8).font_semibold().text_color(t.foreground).child(`${mac.name} is a Mac: allow its folders once`))
+      .child(div().text_size(12.8).font_semibold().text_color(t.foreground).child(tr("{machine} is a Mac: allow its folders once", { machine: mac.name })))
       .child(
         div()
           .text_size(12.5)
           .line_height("18px")
           .text_color(t.muted)
-          .child("macOS asks on the Mac's own screen before an agent reads Desktop, Documents or Downloads, and waits until someone answers. Give herdr-core Full Disk Access there and it never asks again: in the list, press + and pick this file:"),
+          .child(tr("macOS asks on the Mac's own screen before an agent reads Desktop, Documents or Downloads, and waits until someone answers. Give herdr-core Full Disk Access there and it never asks again: in the list, press + and pick this file:")),
       )
       .child(div().px(8).py(4).rounded(6).bg(t.background).border_1().border_color(t.border).text_size(12).text_color(t.foreground).child(mac.core))
       .child(
@@ -201,9 +201,9 @@ export default class MachineAdd extends View {
                 this.opened[target] = true;
                 cx.notify();
               })
-              .child(`Open the setting on ${mac.name}`),
+              .child(tr("Open the setting on {machine}", { machine: mac.name })),
           )
-          .when(Boolean(this.opened[target]), (el) => el.child(div().text_size(12).text_color(t.dim).child("It's open on the Mac's screen."))),
+          .when(Boolean(this.opened[target]), (el) => el.child(div().text_size(12).text_color(t.dim).child(tr("It's open on the Mac's screen.")))),
       );
   }
 
@@ -224,16 +224,16 @@ export default class MachineAdd extends View {
         .id(`ma-copy-${target}`).px(10).py(4).rounded(6).bg(t.raised).text_color(t.foreground)
         .text_size(12).cursor_pointer().hover(s => s.bg(t.hover))
         .on_click((_e, cx) => { cx.write_to_clipboard(command); this.copiedCommand = command; cx.notify(); })
-        .child(this.copiedCommand === command ? "Copied" : "Copy"))));
+        .child(this.copiedCommand === command ? tr("Copied") : tr("Copy")))));
   }
 
   row(t, target, label, sub) {
     const st = this.state[target];
     const done = this.isAdded(target);
     const right = done
-      ? h_flex().gap(5).items_center().text_size(12).text_color(t.ansi2).child(svg(I("circle-check")).size(13)).child("Added")
+      ? h_flex().gap(5).items_center().text_size(12).text_color(t.ansi2).child(svg(I("circle-check")).size(13)).child(tr("Added"))
       : st === "adding"
-        ? h_flex().gap(6).items_center().text_size(12).text_color(t.muted).child(svg(I("spinner")).size(12).text_color(t.working).spin(900)).child("Connecting")
+        ? h_flex().gap(6).items_center().text_size(12).text_color(t.muted).child(svg(I("spinner")).size(12).text_color(t.working).spin(900)).child(tr("Connecting"))
         : div()
               .id(`ma-add-${target}`)
               .px(10)
@@ -249,7 +249,7 @@ export default class MachineAdd extends View {
               .cursor_pointer()
               .hover((s) => s.bg(t.hover))
               .on_click((_e, cx) => this.add(target, cx))
-              .child("Add");
+              .child(tr("Add"));
     const idle = !done && !st;
     return v_flex()
       .flex_none()
@@ -284,16 +284,16 @@ export default class MachineAdd extends View {
       .p(18)
       .bg(t.popover)
       .text_color(t.foreground)
-      .child(h_flex().items_center().child(div().flex_1().text_size(15).font_semibold().child("Add a machine")).child(div().id("ma-esc").px(6).py(2).rounded(5).text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click(() => this.close()).child("Esc")))
+      .child(h_flex().items_center().child(div().flex_1().text_size(15).font_semibold().child(tr("Add a machine"))).child(div().id("ma-esc").px(6).py(2).rounded(5).text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click(() => this.close()).child("Esc")))
       .child(
         div()
           .pt(6)
           .text_size(12.8)
           .line_height("19px")
           .text_color(t.muted)
-          .child("A VPS, a Mac mini, a box at home: Herdr reaches it over ssh, and agents there keep running while your laptop sleeps."),
+          .child(tr("A VPS, a Mac mini, a box at home: Herdr reaches it over ssh, and agents there keep running while your laptop sleeps.")),
       )
-      .child(div().pt(16).pb(6).text_size(11.5).font_medium().text_color(t.dim).child(hosts.length ? "From your ssh config" : "Your ssh config lists no hosts"))
+      .child(div().pt(16).pb(6).text_size(11.5).font_medium().text_color(t.dim).child(hosts.length ? tr("From your ssh config") : tr("Your ssh config lists no hosts")))
       .child(
         v_flex()
           .id("ma-hosts")
@@ -303,11 +303,11 @@ export default class MachineAdd extends View {
           .overflow_y_scroll()
           .children(
             this.hosts === null
-              ? [div().px(10).py(8).text_size(12.5).text_color(t.dim).child("Reading ~/.ssh/config…")]
-              : hosts.map((h) => this.row(t, h.alias, h.alias, [h.user, h.hostname].filter(Boolean).join("@") || (h.aliases.length ? `also ${h.aliases.join(", ")}` : ""))),
+              ? [div().px(10).py(8).text_size(12.5).text_color(t.dim).child(tr("Reading ~/.ssh/config…"))]
+              : hosts.map((h) => this.row(t, h.alias, h.alias, [h.user, h.hostname].filter(Boolean).join("@") || (h.aliases.length ? tr("also {aliases}", { aliases: h.aliases.join(", ") }) : ""))),
           ),
       )
-      .child(div().pt(14).pb(6).text_size(11.5).font_medium().text_color(t.dim).child("Or type how ssh reaches it"))
+      .child(div().pt(14).pb(6).text_size(11.5).font_medium().text_color(t.dim).child(tr("Or type how ssh reaches it")))
       .child(
         h_flex()
           .gap(8)
@@ -340,7 +340,7 @@ export default class MachineAdd extends View {
               .when(!this.typed.trim(), (el) => el.opacity(0.4))
               .cursor_pointer()
               .on_click((_e, cx) => this.add(this.typed, cx))
-              .child("Add"),
+              .child(tr("Add")),
           ),
       )
       .when(Boolean(this.typed.trim() && this.state[this.typed.trim()]), (el) => el.child(div().pt(6).child(this.message(t, this.typed.trim()))));

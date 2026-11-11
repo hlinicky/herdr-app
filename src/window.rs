@@ -580,7 +580,7 @@ impl AppWindow {
         w.apply_look(window, cx);
         w.show_layout_notes(window, cx);
         if let (Some(n), false) = (&name, gone.is_empty()) {
-            let note = json!({ "title": format!("{n} needs mods that aren't here"), "body": format!("Showing Herdr instead. Missing: {}. Your {n} layout file is still there.", gone.join(", ")), "level": "info", "timeout": 12000 });
+            let note = json!({ "title": crate::i18n::tv("{layout} needs mods that aren't here", json!({ "layout": n })), "body": crate::i18n::tv("Showing Herdr instead. Missing: {mods}. Your {layout} layout file is still there.", json!({ "mods": gone.join(", "), "layout": n })), "level": "info", "timeout": 12000 });
             w.open_overlay(mods::new_overlay_id(), json!({ "kind": "toast", "notification": note }), window, cx);
         }
 
@@ -1107,7 +1107,7 @@ impl AppWindow {
     /// What installing layouts kept of the person's own, as toasts.
     fn show_layout_notes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         for clone in mods::take_sync_notes() {
-            let n = json!({ "title": format!("Your edits are in {clone}"), "body": "Herdr's own layouts and mods can't be changed: clone one to make it yours.", "level": "info", "timeout": 12000 });
+            let n = json!({ "title": crate::i18n::tv("Your edits are in {clone}", json!({ "clone": clone })), "body": crate::i18n::t("Herdr's own layouts and mods can't be changed: clone one to make it yours."), "level": "info", "timeout": 12000 });
             self.open_overlay(mods::new_overlay_id(), json!({ "kind": "toast", "notification": n }), window, cx);
         }
     }
@@ -1877,7 +1877,7 @@ impl AppWindow {
     }
 
     fn layout_notice(&mut self, title: &str, body: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let spec = json!({"kind":"toast", "notification":{"title":title,"body":body,"level":"info"}});
+        let spec = json!({"kind":"toast", "notification":{"title":crate::i18n::t(title),"body":body,"level":"info"}});
         self.open_overlay(mods::new_overlay_id(), spec, window, cx);
     }
 
@@ -1957,7 +1957,7 @@ impl AppWindow {
                     if notify {
                         tracing::warn!("layout on {machine:?} unavailable: {error}");
                         slot.notified_error = Some(error.clone());
-                        self.layout_notice("Layout unavailable", &format!("{}: {error}", if machine.is_empty() { "This machine" } else { &machine }), window, cx);
+                        self.layout_notice("Layout unavailable", &format!("{}: {error}", if machine.is_empty() { crate::i18n::t("This machine") } else { machine.to_string() }), window, cx);
                     }
                     continue;
                 }
@@ -1974,7 +1974,7 @@ impl AppWindow {
                 changed = true;
             }
             if conflict {
-                self.layout_notice("Layout changed elsewhere", "The other screen's layout is shown.", window, cx);
+                self.layout_notice("Layout changed elsewhere", &crate::i18n::t("The other screen's layout is shown."), window, cx);
             }
         }
         if let Some(machines) = machines {
@@ -2119,7 +2119,7 @@ impl AppWindow {
         let name = rec
             .and_then(|r| r.get("name").and_then(Value::as_str).filter(|s| !s.is_empty()).map(str::to_owned))
             .or_else(|| app.as_deref().map(crate::programs::name))
-            .unwrap_or_else(|| "An agent".into());
+            .unwrap_or_else(|| crate::i18n::t("An agent"));
         // A sub-agent lives where its top agent does.
         let home = self.root_agent(addr);
         let place = self.model.pane_of(&home).and_then(|pane| {
@@ -2127,8 +2127,8 @@ impl AppWindow {
             Some(format!("{} / {}", self.model.space_name(p, &self::home()), Model::tab_name(p, c)))
         });
         let (title, level) = match alert {
-            model::Alert::Blocked => (format!("{name} needs you"), "error"),
-            model::Alert::Done => (format!("{name} finished"), "info"),
+            model::Alert::Blocked => (crate::i18n::tv("{name} needs you", json!({ "name": name })), "error"),
+            model::Alert::Done => (crate::i18n::tv("{name} finished", json!({ "name": name })), "info"),
         };
         let notification = json!({
             "title": title, "body": place, "level": level,
@@ -2352,7 +2352,7 @@ impl AppWindow {
             }).await;
             if let Some(body) = failure {
                 let _ = this.update_in(cx, |this, window, cx| {
-                    this.open_overlay(mods::new_overlay_id(), json!({"kind":"toast", "notification":{"title":"Terminal failed to start", "body":body, "level":"error"}}), window, cx);
+                    this.open_overlay(mods::new_overlay_id(), json!({"kind":"toast", "notification":{"title":crate::i18n::t("Terminal failed to start"), "body":body, "level":"error"}}), window, cx);
                 });
             }
         }).detach();
@@ -2777,7 +2777,7 @@ impl AppWindow {
     }
 
     fn command_error(&mut self, name: &str, error: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let spec = json!({"kind":"toast", "notification":{"title":format!("{name} failed"),"body":error,"level":"error"}});
+        let spec = json!({"kind":"toast", "notification":{"title":crate::i18n::tv("{command} failed", json!({ "command": name })),"body":error,"level":"error"}});
         self.open_overlay(mods::new_overlay_id(), spec, window, cx);
     }
 
@@ -2883,7 +2883,7 @@ impl AppWindow {
             return;
         }
         let spec = json!({ "mod": "prompt", "kind": "dialog", "width": 380,
-            "props": { "title": title, "value": current.as_deref().unwrap_or(""), "hint": hint, "command": { "name": name, "args": args } } });
+            "props": { "title": crate::i18n::t(title), "value": current.as_deref().unwrap_or(""), "hint": crate::i18n::t(hint), "command": { "name": name, "args": args } } });
         self.open_overlay("rename".into(), spec, window, cx);
     }
 
@@ -2904,8 +2904,13 @@ impl AppWindow {
                         return self.fail("space.close ends its terminals: pass confirmed: true");
                     }
                     let panes: usize = p.tabs.iter().map(|c| c.root.panes().len()).sum();
-                    let detail = format!("{} \u{2014} {} tabs, {} terminals", self.model.space_name(p, &home()), p.tabs.len(), panes);
-                    self.confirm("Close space?", &detail, "space.close", json!({ "id": id, "confirmed": true }), window, cx);
+                    let detail = format!(
+                        "{} \u{2014} {}, {}",
+                        self.model.space_name(p, &home()),
+                        crate::i18n::tv("{n} tabs", json!({ "n": p.tabs.len() })),
+                        crate::i18n::tv("{n} terminals", json!({ "n": panes })),
+                    );
+                    self.confirm(&crate::i18n::t("Close space?"), &detail, "space.close", json!({ "id": id, "confirmed": true }), window, cx);
                     return;
                 }
                 let addrs = self.model.remove_space(&id);

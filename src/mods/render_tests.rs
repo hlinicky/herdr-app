@@ -109,6 +109,15 @@ fn fixture(populated: bool, props: Value, update: Value) -> BTreeMap<String, Val
 
 fn module(values: BTreeMap<String, Value>, calls: Rc<RefCell<Calls>>) -> HostModule {
     let mut module = HostModule::new("herdr");
+    // Texts in the fixture's language, as the app translates them.
+    let language = values.get("settings").and_then(|s| s.get("language")).and_then(Value::as_str).unwrap_or("en").to_owned();
+    module = module.function("tr", move |a| {
+        let vars = a.get(1).map(from_host).unwrap_or(Value::Null);
+        Ok(crate::i18n::translate(&language, a.string(0)?, &vars).into())
+    });
+    module = module.function("languages", |_| {
+        Ok(to_host(&Value::Array(crate::i18n::LANGUAGES.iter().map(|(code, name)| json!({"code": code, "name": name})).collect())))
+    });
     for (name, value) in values {
         module = module.function(name, move |_| Ok(to_host(&value)));
     }
@@ -702,11 +711,32 @@ fn option_key_settings_are_only_shown_on_macos(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn the_language_section_offers_system_and_each_language_in_its_own_words(cx: &mut TestAppContext) {
+    cx.update(gpui_shell::init);
+    let staged = Staged::new();
+    for (language, title, system) in [("en", "Language", "System (English)"), ("sk", "Jazyk", "Systém (Slovenčina)")] {
+        let mut p = props();
+        p["section"] = json!("language");
+        let mut values = fixture(true, p, updates("current", "current"));
+        let mut settings = values["settings"].clone();
+        settings["language"] = json!(language);
+        values.insert("settings".into(), settings);
+        let tree = describe_with_values(cx, &staged, "frame/settings", values, None).unwrap();
+        for id in ["st-s-language", "st-lang-system", "st-lang-en", "st-lang-sk"] {
+            assert!(tree.contains(id), "{language}: missing {id}: {tree}");
+        }
+        for text in [title, system, "English", "Slovenčina"] {
+            assert!(tree.contains(text), "{language}: missing {text:?}: {tree}");
+        }
+    }
+}
+
+#[gpui::test]
 fn settings_sections_and_updates(cx: &mut TestAppContext) {
     cx.update(gpui_shell::init);
     let start = Instant::now();
     let staged = Staged::new();
-    for section in ["look", "alerts", "privacy", "updates"] {
+    for section in ["look", "language", "alerts", "privacy", "updates"] {
         let mut p = props();
         p["section"] = json!(section);
         describe(cx, &staged, "frame/settings", true, p, updates("current", "current"), None).unwrap();

@@ -404,6 +404,9 @@ pub struct Person {
     pub theme: Option<crate::layout::ThemeChoice>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub colors: BTreeMap<String, String>,
+    /// The interface's language (i18n.rs): the system's, or one always.
+    #[serde(skip_serializing_if = "crate::i18n::Language::is_system")]
+    pub language: crate::i18n::Language,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -460,6 +463,7 @@ impl Default for Person {
             appearance: Appearance::System,
             theme: None,
             colors: BTreeMap::new(),
+            language: crate::i18n::Language::System,
         }
     }
 }
@@ -495,6 +499,8 @@ pub struct Settings {
     pub minimum_contrast: f32,
     pub option_as_alt: OptionAsAlt,
     pub sounds: Sounds,
+    /// The interface's language now: a code from `languages()` ("en", "sk").
+    pub language: String,
 }
 
 /// Attention sounds: when an agent needs you, and when one finished while you
@@ -537,6 +543,7 @@ impl Default for Settings {
             minimum_contrast: 1.0,
             option_as_alt: OptionAsAlt::Auto,
             sounds: Sounds::default(),
+            language: "en".into(),
         }
     }
 }
@@ -575,6 +582,7 @@ impl Settings {
             clipboard_write: person.clipboard_write,
             minimum_contrast: person.minimum_contrast,
             option_as_alt: person.option_as_alt,
+            language: person.language.resolve().into(),
         }
     }
 }
@@ -941,7 +949,7 @@ mod tests {
     /// settings.json key.
     #[test]
     fn the_guide_explains_every_setting() {
-        let all = Person { core: Some(String::new()), font: Some(String::new()), font_size: Some(1.0), ui_font: Some(String::new()), telemetry: false, clipboard_write: false, appearance: Appearance::Light, theme: Some(crate::layout::ThemeChoice::One(String::new())), colors: [("text".into(), String::new())].into(), ..Person::default() };
+        let all = Person { core: Some(String::new()), font: Some(String::new()), font_size: Some(1.0), ui_font: Some(String::new()), telemetry: false, clipboard_write: false, appearance: Appearance::Light, language: crate::i18n::Language::Sk, theme: Some(crate::layout::ThemeChoice::One(String::new())), colors: [("text".into(), String::new())].into(), ..Person::default() };
         let keys: Vec<String> = serde_json::to_value(&all).unwrap().as_object().unwrap().keys().cloned().collect();
         let guide = include_str!("../defaults/AGENTS.md");
         let section = guide.split("## The person").nth(1).and_then(|s| s.split("\n## ").next()).unwrap_or_default();

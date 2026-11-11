@@ -959,7 +959,7 @@ fn module(inst: Instance, copy: u64) -> HostModule {
         .async_function("feedbackPickImages", move |_| {
             if !feedback_frame { return Err(HostError::new("feedback screenshots are frame-only")); }
             let picked = gpui_shell::with_current_app(|cx| cx.prompt_for_paths(gpui::PathPromptOptions {
-                files: true, directories: false, multiple: true, prompt: Some("Add".into()),
+                files: true, directories: false, multiple: true, prompt: Some(crate::i18n::t("Add").into()),
             })).ok_or_else(|| HostError::new("no window to pick from"))?;
             Ok(async move {
                 let paths = picked.await.ok().and_then(Result::ok).flatten().unwrap_or_default();
@@ -981,7 +981,7 @@ fn module(inst: Instance, copy: u64) -> HostModule {
             })
         })
         .async_function("pickFolder", |a| {
-            let prompt = a.get(0).map(from_host).and_then(|v| v.get("prompt").and_then(Value::as_str).map(str::to_owned)).unwrap_or_else(|| "Open".into());
+            let prompt = a.get(0).map(from_host).and_then(|v| v.get("prompt").and_then(Value::as_str).map(str::to_owned)).unwrap_or_else(|| crate::i18n::t("Open"));
             let picked = gpui_shell::with_current_app(|cx| cx.prompt_for_paths(gpui::PathPromptOptions {
                 files: false, directories: true, multiple: false, prompt: Some(prompt.into()),
             })).ok_or_else(|| HostError::new("no window to pick from"))?;
@@ -1055,6 +1055,13 @@ fn module(inst: Instance, copy: u64) -> HostModule {
         .function("window", reader(reads.clone(), "window", |s| &s.window))
         .function("theme", |_| Ok(to_host(&serde_json::to_value(&*crate::settings::theme()).unwrap_or(Value::Null))))
         .function("settings", |_| Ok(to_host(&serde_json::to_value(&*crate::settings::get()).unwrap_or(Value::Null))))
+        .function("tr", |a| {
+            let vars = a.get(1).map(from_host).unwrap_or(Value::Null);
+            Ok(crate::i18n::tv(a.string(0)?, vars).into())
+        })
+        .function("languages", |_| {
+            Ok(to_host(&Value::Array(crate::i18n::LANGUAGES.iter().map(|(code, name)| json!({ "code": code, "name": name })).collect())))
+        })
         .function("keys", |_| {
             let list: Vec<Value> = crate::keys::listing().into_iter().map(|(s, k, a)| json!({ "section": s, "keys": k, "action": a })).collect();
             Ok(to_host(&Value::Array(list)))

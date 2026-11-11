@@ -7,7 +7,7 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { commands, layouts, keys, run, theme, props, closeOverlay, openOverlay, shared, window as win } from "herdr";
+import { commands, layouts, keys, run, theme, props, closeOverlay, openOverlay, shared, window as win, tr } from "herdr";
 
 // The list keeps one height while you move: rows and group titles have fixed
 // heights, and the window shows as many as fit in LIST_H.
@@ -19,7 +19,9 @@ const HEAD_H = 26;
 const LIST_H = SHOWN * ROW_H;
 const GROUPS = ["Recent", "Tab", "Pane", "Space", "Layout", "Terminal", "Agent", "Window", "App"];
 
-// The palette's names for commands: [command, args, group, title, keywords].
+// The palette's names for commands: [command, args, group, title, keywords,
+// label?]. Titles and groups are English here and translated where shown;
+// label, when given, makes the shown title (a title with a value in it).
 const NAMED = [
   ["tab.new", {}, "Tab", "New tab", "tab agent new task"],
   ["mod.open", { name: "picker" }, "Tab", "Go to space or tab…", "switch jump find"],
@@ -59,7 +61,7 @@ const NAMED = [
   ["app.zoom_out", {}, "App", "Zoom out", "smaller font size"],
   ["app.zoom_reset", {}, "App", "Reset zoom", "font size"],
   ["app.quit", {}, "App", "Quit Herdr", "exit"],
-  ...["graphite", "ink", "moss", "atom-one-dark"].map((n) => ["app.theme", { name: n }, "App", `Theme: ${n.replace(/-/g, " ")}`, "colors look"]),
+  ...["graphite", "ink", "moss", "atom-one-dark"].map((n) => ["app.theme", { name: n }, "App", `Theme: ${n.replace(/-/g, " ")}`, "colors look", () => tr("Theme: {name}", { name: n.replace(/-/g, " ") })]),
 ];
 
 // Commands that act on something you point at (ids, terminals): not for a list.
@@ -76,24 +78,26 @@ function titleOf(name) {
   return { group: noun.charAt(0).toUpperCase() + noun.slice(1), title: `${verb.replace(/_/g, " ")} ${noun}`.replace(/^./, (c) => c.toUpperCase()) };
 }
 
-// Every entry for the state we're in now.
+// Every entry for the state we're in now. `title` and `group` stay English
+// (searching in English always works); `label` and `heading` are what shows.
 function entries() {
   const known = new Set(commands().map((c) => c.name));
   const mac = win()?.platform === "macos";
   const list = NAMED.filter(([n]) => known.has(n))
     .filter(([n]) => !(mac && n.startsWith("window.")))
-    .map(([name, args, group, title, words]) => ({ name, args, group, title, words }));
+    .map(([name, args, group, title, words, label]) => ({ name, args, group, title, words, label: label ? label() : tr(title) }));
   for (const l of layouts()) {
     const t = { main: "Herdr", terminals: "Terminals", win98: "Herdr 98" }[l] ?? l.charAt(0).toUpperCase() + l.slice(1);
-    list.push({ name: "layout.switch", args: { name: l }, group: "Layout", title: `Layout: ${t}`, words: `look ${l}` });
+    list.push({ name: "layout.switch", args: { name: l }, group: "Layout", title: `Layout: ${t}`, words: `look ${l}`, label: tr("Layout: {name}", { name: t }) });
   }
   // Anything new in the app shows up too, until it gets a better name here.
   const named = new Set(NAMED.map(([n]) => n));
   for (const c of commands()) {
     if (named.has(c.name) || HIDDEN.has(c.name) || c.args.some((a) => a.required && a.name !== "name")) continue;
-    list.push({ name: c.name, args: {}, ...titleOf(c.name), words: c.about });
+    const auto = titleOf(c.name);
+    list.push({ name: c.name, args: {}, ...auto, words: c.about, label: tr(auto.title) });
   }
-  return list.map((e) => ({ ...e, id: `${e.name}:${JSON.stringify(e.args)}` }));
+  return list.map((e) => ({ ...e, heading: tr(e.group), id: `${e.name}:${JSON.stringify(e.args)}` }));
 }
 
 // The key bound to an entry: `name` or `name:value` in keys.json.
@@ -131,7 +135,7 @@ function fuzzy(q, text) {
 export default class Palette extends View {
   init(_props, cx) {
     this.query = "";
-    this.input = InputState.new({ placeholder: "Type a command…" });
+    this.input = InputState.new({ placeholder: tr("Type a command…") });
     this.input.on("change", (_e, cx) => { this.query = this.input.value(); this.at = 0; cx.notify(); });
     this.input.on("submit", () => this.go(this.rows()[this.at]?.e));
     this.input.focus();
@@ -154,7 +158,7 @@ export default class Palette extends View {
     this.close();
     if (e.name === "mod.clone") {
       openOverlay({ mod: "prompt", kind: "dialog", width: 380, props: {
-        title: "Duplicate mod", hint: "Mod to copy; creates <name>-copy",
+        title: tr("Duplicate mod"), hint: tr("Mod to copy; creates <name>-copy"),
         command: { name: "mod.clone", args: {} },
       } });
     } else {
@@ -170,13 +174,22 @@ export default class Palette extends View {
       const recent = this.recent.map((id) => all.find((e) => e.id === id)).filter(Boolean).slice(0, 5);
       const rest = GROUPS.slice(1).flatMap((g) => all.filter((e) => e.group === g && !recent.includes(e)));
       const others = all.filter((e) => !GROUPS.includes(e.group) && !recent.includes(e));
-      return [...recent.map((e) => ({ e, head: "Recent" })), ...[...rest, ...others].map((e) => ({ e, head: e.group }))];
+      return [...recent.map((e) => ({ e, head: tr("Recent") })), ...[...rest, ...others].map((e) => ({ e, head: e.heading }))];
     }
     const rank = (e) => this.recent.indexOf(e.id);
     return all
       .map((e) => {
-        const title = fuzzy(q, e.title);
-        const more = fuzzy(q, `${e.group} ${e.title} ${e.name} ${e.words}`);
+        // The shown title, and in another language the English one too: the
+        // better one counts, but only the shown one can light up its letters.
+        const better = (a, b) => (!a ? b : !b || a.score >= b.score ? a : b);
+        const translated = e.label !== e.title;
+        const shown = fuzzy(q, e.label);
+        const english = translated ? fuzzy(q, e.title) : null;
+        const title = better(shown, english && { score: english.score, hits: [] });
+        const more = better(
+          fuzzy(q, `${e.group} ${e.title} ${e.name} ${e.words}`),
+          translated ? fuzzy(q, `${e.heading} ${e.label} ${e.name} ${e.words}`) : null,
+        );
         const best = title ?? (more && { score: more.score - 4, hits: [] });
         return best && { e, score: best.score, hits: best.hits };
       })
@@ -258,8 +271,8 @@ export default class Palette extends View {
           .when(on, (el) => el.bg(t.selected))
           .hover((s) => s.bg(t.hover))
           .on_click(() => this.go(r.e))
-          .child(div().flex_1().min_w(0).child(this.title(t, r.e.title, r.hits, on)))
-          .when(Boolean(this.query), (el) => el.child(div().text_size(11.5).text_color(t.dim).child(r.e.group)))
+          .child(div().flex_1().min_w(0).child(this.title(t, r.e.label, r.hits, on)))
+          .when(Boolean(this.query), (el) => el.child(div().text_size(11.5).text_color(t.dim).child(r.e.heading)))
           .when(Boolean(k), (el) => el.child(key(k))),
       );
     });
@@ -315,7 +328,7 @@ export default class Palette extends View {
                 cx.notify();
               })
               .children(fixed ? list : [v_flex().children(list)])
-          : div().px(16).py(14).text_size(13).text_color(t.dim).child(`Nothing matches "${this.query}". Places are in the picker.`),
+          : div().px(16).py(14).text_size(13).text_color(t.dim).child(tr('Nothing matches "{query}". Places are in the picker.', { query: this.query })),
       );
   }
 }

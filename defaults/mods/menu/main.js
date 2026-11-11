@@ -1,11 +1,12 @@
 // Context menus (Herdr's items). Opened as a popup with
 // props { tab: "pane" | "tab" | "space" | "global", target }.
-// ↑/↓ move, Enter runs, Esc closes. An item is [label, command, args];
+// ↑/↓ move, Enter runs, Esc closes. An item is [label, command, args]
+// (the label as shown, translated);
 // a command "worktree" opens the worktree dialog instead.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { run, props, closeOverlay, openOverlay, theme, keys, terminals, spaces, panes, exec } from "herdr";
+import { run, props, closeOverlay, openOverlay, theme, keys, terminals, spaces, panes, exec, tr } from "herdr";
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s) {
@@ -38,43 +39,43 @@ function items(p, git) {
       return [
         ...(inTab
           ? [
-              ["Split right", "pane.split", { direction: "right", pane: tg.pane }],
-              ["Split down", "pane.split", { direction: "down", pane: tg.pane }],
-              ["Zoom", "pane.zoom", { pane: tg.pane }],
+              [tr("Split right"), "pane.split", { direction: "right", pane: tg.pane }],
+              [tr("Split down"), "pane.split", { direction: "down", pane: tg.pane }],
+              [tr("Zoom"), "pane.zoom", { pane: tg.pane }],
             ]
           : []),
         ...(term
           ? [
               toProgram
-                ? ["Use Herdr right-click menu", "terminal.right_click", { terminal: term.address, to: "menu" }]
-                : ["Send right-clicks to pane", "terminal.right_click", { terminal: term.address, to: "program" }],
+                ? [tr("Use Herdr right-click menu"), "terminal.right_click", { terminal: term.address, to: "menu" }]
+                : [tr("Send right-clicks to pane"), "terminal.right_click", { terminal: term.address, to: "program" }],
             ]
           : []),
-        ...(parent ? [[`Send back to ${parent.name || parent.address}`, "terminal.park", { terminal: term.address }]] : []),
-        ...(inTab ? [["Close pane", "pane.close", { pane: tg.pane }]] : []),
+        ...(parent ? [[tr("Send back to {name}", { name: parent.name || parent.address }), "terminal.park", { terminal: term.address }]] : []),
+        ...(inTab ? [[tr("Close pane"), "pane.close", { pane: tg.pane }]] : []),
       ];
     }
     case "tab":
       return [
-        ["Rename", "tab.rename", { id: tg.id }],
-        ["New tab", "tab.new", { space: tg.space }],
-        ["Close", "tab.close", { id: tg.id }],
+        [tr("Rename"), "tab.rename", { id: tg.id }],
+        [tr("New tab"), "tab.new", { space: tg.space }],
+        [tr("Close"), "tab.close", { id: tg.id }],
       ];
     case "space":
       return [
-        ["Rename", "space.rename", { id: tg.id }],
-        ...(git ? [["New worktree", "worktree", { space: tg.id, action: "new" }], ["Open worktree", "worktree", { space: tg.id, action: "open" }]] : []),
-        ...(git === "linked" ? [["Remove worktree", "worktree", { space: tg.id, action: "remove" }]] : []),
-        ["Close", "space.close", { id: tg.id }],
+        [tr("Rename"), "space.rename", { id: tg.id }],
+        ...(git ? [[tr("New worktree"), "worktree", { space: tg.id, action: "new" }], [tr("Open worktree"), "worktree", { space: tg.id, action: "open" }]] : []),
+        ...(git === "linked" ? [[tr("Remove worktree"), "worktree", { space: tg.id, action: "remove" }]] : []),
+        [tr("Close"), "space.close", { id: tg.id }],
       ];
     default:
       return [
-        ["New space", "space.new", {}],
-        ["Keybinds", "app.help", {}],
-        ["Theme: graphite", "app.theme", { name: "graphite" }],
-        ["Theme: ink", "app.theme", { name: "ink" }],
-        ["Theme: moss", "app.theme", { name: "moss" }],
-        ["Theme: atom one dark", "app.theme", { name: "atom-one-dark" }],
+        [tr("New space"), "space.new", {}],
+        [tr("Keybinds"), "app.help", {}],
+        [tr("Theme: {name}", { name: "graphite" }), "app.theme", { name: "graphite" }],
+        [tr("Theme: {name}", { name: "ink" }), "app.theme", { name: "ink" }],
+        [tr("Theme: {name}", { name: "moss" }), "app.theme", { name: "moss" }],
+        [tr("Theme: {name}", { name: "atom one dark" }), "app.theme", { name: "atom-one-dark" }],
       ];
   }
 }
