@@ -101,3 +101,6 @@ strip = "none"
 
 [profile.dev.package."*"]
 opt-level = 2
+# Dependencies (vendor/ too) build without debug info: a much smaller target/.
+# herdr-app and ghostty-sys keep full debug info.
+debug = false
